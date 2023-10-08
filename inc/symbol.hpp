@@ -29,6 +29,7 @@ public:
   bool isGlobalSymbol();
   int getValue();
   friend ostream& operator <<(ostream& os, const Symbol &sym);
+  int getId();
 };
 
 #endif

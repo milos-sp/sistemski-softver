@@ -4,9 +4,12 @@
 #include <list>
 #include "./symbol.hpp"
 #include "./section.hpp"
+#include "./literalPool.hpp"
+#include "./relocation.hpp"
 #include <unordered_map>
 #include <vector>
 #include <sstream>
+#include <iomanip>
 using namespace std;
 
 class Assembler{
@@ -16,6 +19,8 @@ private:
   static list<Symbol*> symbolList;
   static list<Section*> sectionList;
   static unordered_map<string, vector<char>> machineCode; //za svaku sekciju hex kod
+  static unordered_map<string, vector<LiteralSym*>> literalPool;
+  static unordered_map<string, vector<RelocationSymbol*>> relocationList;
 
 public:
 
@@ -59,10 +64,16 @@ public:
   static Section* getSection(string name);
   static void addData(string d);
   static void printData();
+  static void clear();
   static string prepareData(int ins);
   static string prepareRegister(string reg);
   static string prepareLiteral(int lit);
-  static string prepareOffset(int o);
+  static string prepareOffset(int o, string reg);
+  static void addToPool(LiteralSym* l);
+  static LiteralSym* getFromPool(string n);
+  static void addPoolData(string section);
+  static void addRelocation(int offset, Symbol* s);
+  static void printRelocationData();
 };
 
 #endif

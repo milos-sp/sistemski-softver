@@ -64,14 +64,22 @@ line:
     //cout << "New section: " << $2 << endl;
     Section *s = new Section($2);
     if(firstPass){
+      string n = ".";
+      Symbol* sym = new Symbol(n+$2, s, false); //dodavanje i u tabelu simbola
+      Assembler::addSymbol(sym);
       if(!Assembler::hasSection(s)) Assembler::addSection(s);
       else{
         cerr << "Section " << $2 << " already exists" << endl;
         exit(-1);
       }
-      Assembler::currSection = Assembler::getSection($2);
-    }else{
       if(Assembler::currSection) Assembler::currSection->setSize(Assembler::locationCounter);
+      Assembler::currSection = Assembler::getSection($2);
+      Assembler::locationCounter = 0;
+    }else{
+      delete s;
+     // if(Assembler::currSection) Assembler::currSection->setSize(Assembler::locationCounter);
+      //dodavanje bazena literala u masinski kod
+      Assembler::addPoolData(Assembler::currSection->getName()); //da li povecavam section size?
       Assembler::currSection = Assembler::getSection($2);
       Assembler::locationCounter = 0;
     }
@@ -79,7 +87,6 @@ line:
     free($2);
   }
   | SKIP INTEGER ENDLS{
-    cout << "Skip " << $2 << endl;
     Assembler::locationCounter += $2;
     if(!firstPass){
       string s = "";
@@ -94,7 +101,6 @@ line:
     //cout << "Found a comment " << endl;
   }
   | STRING COLON ENDLS {
-    cout << "New label: " << endl;
     Symbol* s = new Symbol($1, nullptr, false);
     if(firstPass){
       s->setSection(Assembler::currSection);
@@ -111,13 +117,12 @@ line:
     else{
       s = Assembler::getSymbol($1);
      // s->setSection(Assembler::currSection);
-     // s->setOffset(Assembler::locationCounter);
+      s->setOffset(Assembler::locationCounter);
     }
     free($1);
   }
   |
   STRING COLON {
-    cout << "New label: " << endl;
     Symbol* s = new Symbol($1, nullptr, false);
     if(firstPass) {
       s->setSection(Assembler::currSection);
@@ -132,9 +137,29 @@ line:
     free($1);
   }
   | INSTR HEX ENDLS { //za jmp
-    cout << "Instruction opcode: " << $1 << endl;
-    cout << "Address: " << $2 << endl;
     //drugi mod da bi se pristupilo bazenu literala
+    int opcode = $1 | 8;
+    int hex = $2;
+    string h = to_string(hex);
+    if(firstPass){
+      if(Assembler::getFromPool(h) == nullptr){ //ako nije vec dodat
+        LiteralSym* l = new LiteralSym(h, hex);
+        Assembler::addToPool(l);
+      }
+    }else{
+      //upisuje se pomeraj do bazena gde se nalazi literal
+      //a literal ce se na kraju dodati u masinski kod
+      string s = "";
+      int offset = Assembler::currSection->getSize() + Assembler::getFromPool(h)->getOffset() - 4 - Assembler::locationCounter;
+      //cout << "Offset to pool: " << offset << endl;
+      if(offset > 4095){ //displacement moze biti samo pozitivan
+        cerr << "Offset greater than 2^12 - 1" << endl;
+        exit(-1);
+      }
+      s = s + Assembler::prepareOffset(offset, "r0");
+      s = s + "f0" + Assembler::prepareData(opcode);
+      Assembler::addData(s);
+    }
     Assembler::locationCounter += 4;
   }
   | INSTR STRING ENDLS {
@@ -149,7 +174,7 @@ line:
           //prvi mod ostaje, u displacement pomeraj do simbola
           int displacement = Assembler::getSymbol($2)->getOffset() - Assembler::locationCounter - 4;
           string s = "";
-          s = s + Assembler::prepareOffset(displacement);
+          s = s + Assembler::prepareOffset(displacement, "r0");
           s = s + "f0" + Assembler::prepareData($1);
           Assembler::addData(s);
         }else{
@@ -162,8 +187,6 @@ line:
     free($2);
   }
   | INSTR PERCENT REGISTER ENDLS {
-    cout << "Instruction opcode: " << $1 << endl;
-    cout << "Register: " << $3 << endl;
     Assembler::locationCounter += 4;
     if(!firstPass){
       if($1 == Assembler::NOT){
@@ -173,23 +196,72 @@ line:
         Assembler::addData(s);  
       }else if($1 == Assembler::POP){
         string s = "0400";
-        s = s + Assembler::prepareRegister($3) + "d";
+        s = s + Assembler::prepareRegister($3) + "e";
         s += Assembler::prepareData($1);
         Assembler::addData(s);
       }else{
         //push
         string s = "fc" + Assembler::prepareRegister($3) + "f"; //-4 je displacement
-        s = s + "d0";
+        s = s + "e0";
         s += Assembler::prepareData($1);
         Assembler::addData(s);
       }
     }
     free($3);
   }
+  | INSTR PERCENT REGISTER COMMA PERCENT REGISTER COMMA HEX ENDLS {
+    //branch sa adresom
+    int hex = $8;
+    int opcode = $1 | 8;
+    string h = to_string(hex);
+    if(firstPass){
+      if(Assembler::getFromPool(h) == nullptr){ //ako nije vec dodat
+        LiteralSym* l = new LiteralSym(h, hex);
+        Assembler::addToPool(l);
+      }
+    }else{
+      //upisuje se pomeraj do bazena gde se nalazi literal
+      //a literal ce se na kraju dodati u masinski kod
+      string s = "";
+      int offset = Assembler::currSection->getSize() + Assembler::getFromPool(h)->getOffset() - 4 - Assembler::locationCounter;
+      //cout << "Offset to pool: " << offset << endl;
+      if(offset > 4095){ //displacement moze biti samo pozitivan
+        cerr << "Offset greater than 2^12 - 1" << endl;
+        exit(-1);
+      }
+      s = s + Assembler::prepareOffset(offset, $6);
+      s = s + "f" + Assembler::prepareRegister($3) + Assembler::prepareData(opcode);
+      Assembler::addData(s);
+    }
+    Assembler::locationCounter += 4;
+  }
+  | INSTR PERCENT REGISTER COMMA PERCENT REGISTER COMMA STRING ENDLS {
+    //branch sa simbolom
+    //prvi mod ostaje ako je simbol iz iste sekcije
+    //u suprotnom oruje se opcode sa 8 da se dobije drugi mod
+    if(!firstPass){
+      if(!Assembler::getSymbol($8)){
+      cerr << "On line " << linenum << ": symbol '" << $8 << "' not defined" << endl;
+      exit(-1);
+      }else{
+        if(Assembler::getSymbol($8)->getSection() == Assembler::currSection){
+          //prvi mod ostaje, u displacement pomeraj do simbola
+          int displacement = Assembler::getSymbol($8)->getOffset() - Assembler::locationCounter - 4;
+          string s = "";
+          s = s + Assembler::prepareOffset(displacement, $6);
+          s = s + "f" + Assembler::prepareRegister($3) + Assembler::prepareData($1);
+          Assembler::addData(s);
+        }else{
+          //oruje se sa 8 i ostavlja relokacioni zapis
+          int opcode = $1 | 8;
+        }
+      }
+    }
+    Assembler::locationCounter += 4;
+    free($8);
+  }
   | INSTR PERCENT REGISTER COMMA PERCENT REGISTER ENDLS {
     // add %r1, %r2 ili ove sa csrrd, csrwr
-    cout << "Instruction opcode: " << $1 << endl;
-    cout << "Register 1: " << $3  << " Register 2: " << $6 << endl;
     Assembler::locationCounter += 4;
     if(!firstPass) { //radi za aritmeticke, logicke(bez not) i pomeracke
       string s = "00" + Assembler::prepareRegister($3) + "0";
@@ -218,6 +290,29 @@ line:
   | CALL HEX ENDLS {
     //ovaj hex se dodaje u tabelu literala
     //oruje se opcode sa 1 da bi bio drugi mod
+    int hex = $2;
+    cout << "Hex address: " << hex << endl;
+    int opcode = $1 | 1;
+    string h = to_string(hex);
+    if(firstPass){
+      if(Assembler::getFromPool(h) == nullptr){ //ako nije vec dodat
+        LiteralSym* l = new LiteralSym(h, hex);
+        Assembler::addToPool(l);
+      }
+    }else{
+      //upisuje se pomeraj do bazena gde se nalazi literal
+      //a literal ce se na kraju dodati u masinski kod
+      string s = "";
+      int offset = Assembler::currSection->getSize() + Assembler::getFromPool(h)->getOffset() - 4 - Assembler::locationCounter;
+      //cout << "Offset to pool: " << offset << endl;
+      if(offset > 4095){ //displacement moze biti samo pozitivan
+        cerr << "Offset greater than 2^12 - 1" << endl;
+        exit(-1);
+      }
+      s = s + Assembler::prepareOffset(offset, "r0");
+      s = s + "f0" + Assembler::prepareData(opcode);
+      Assembler::addData(s);
+    }
     Assembler::locationCounter += 4;
   }
   | CALL STRING ENDLS {
@@ -232,24 +327,45 @@ line:
           //prvi mod ostaje, u displacement pomeraj do simbola
           int displacement = Assembler::getSymbol($2)->getOffset() - Assembler::locationCounter - 4;
           string s = "";
-          s = s + Assembler::prepareOffset(displacement);
+          s = s + Assembler::prepareOffset(displacement, "r0");
           s = s + "f0" + Assembler::prepareData($1);
           Assembler::addData(s);
         }else{
-          //oruje se sa 1 i ostavlja relokacioni zapis
+          //oruje se sa 1 i ostavlja relokacioni zapis za bazen literala
+          //u displacement ide pomeraj do bazena
           int opcode = $1 | 1;
+          string s = "";
+          int offset = Assembler::currSection->getSize() + Assembler::getFromPool($2)->getOffset() - 4 - Assembler::locationCounter;
+          if(offset > 4095){ //displacement moze biti samo pozitivan
+            cerr << "Offset greater than 2^12 - 1" << endl;
+            exit(-1);
+          }
+          s = s + Assembler::prepareOffset(offset, "r0");
+          s = s + "f0" + Assembler::prepareData(opcode);
+          Assembler::addData(s);
+          //dodati relokacioni zapis
+          int off = Assembler::currSection->getSize() + Assembler::getFromPool($2)->getOffset();
+          Assembler::addRelocation(off, Assembler::getSymbol($2));
         }
+      }
+    }else{ //prvi prolaz
+      //moram dodati simbol u bazen iako mozda nije potreban
+      string h = $2;
+      if(Assembler::getFromPool(h) == nullptr){ //ako nije vec dodat
+        LiteralSym* l = new LiteralSym(h, 0);
+        Assembler::addToPool(l);
       }
     }
     Assembler::locationCounter += 4;
+    //free($2);
   }
   | INSTR ENDLS {
-    cout << "Instruction opcode: " << $1 << endl;
     if($1 == Assembler::HALT || $1 == Assembler::INT){
       if(!firstPass){
         string s = "000000" + Assembler::prepareData($1);
         Assembler::addData(s);
       }
+      Assembler::locationCounter += 4;
     }else if($1 == Assembler::RET){
       if(!firstPass){
         string s = "0400fd" + Assembler::prepareData($1);
@@ -353,6 +469,9 @@ int main(int argc, char** argv){
   Assembler::printSymbols();
   Assembler::printSections();
   Assembler::printData();
+  Assembler::printRelocationData();
+  
+  Assembler::clear();
 }
 
 void yyerror(const char* s){

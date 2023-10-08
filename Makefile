@@ -1,7 +1,7 @@
-SRCS = parser.cpp lexer.cpp src/assembler.cpp src/symbol.cpp src/section.cpp
+SRCS = parser.cpp lexer.cpp src/assembler.cpp src/symbol.cpp src/section.cpp src/literalPool.cpp src/relocation.cpp
 CC = g++
 
-all: $(SRCS) inc/assembler.hpp inc/symbol.hpp inc/section.hpp
+all: $(SRCS) inc/assembler.hpp inc/symbol.hpp inc/section.hpp inc/literalPool.hpp inc/relocation.hpp
 	$(CC) $(SRCS) -lfl -o asembler
 
 parser.cpp parser.hpp: misc/parser.y inc/assembler.hpp inc/symbol.hpp inc/section.hpp

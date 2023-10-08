@@ -24,6 +24,10 @@ bool Symbol::isGlobalSymbol(){
   return this->isGlobal;
 }
 
+int Symbol::getId(){
+  return this->id;
+}
+
 void Symbol::setGlobal(bool g){
   this->isGlobal = g;
 }
