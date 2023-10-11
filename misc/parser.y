@@ -26,22 +26,26 @@
 
 %token HALT INT IRET JMP CALL RET BEQ BNE BGT PUSH POP XCHG ADD SUB MUL DIV NOT AND OR XOR 
 SHL SHR LD ST CSRRD CSRWR L_PAR R_PAR COMMA PLUS MINUS COLON SEMICOLON PERCENT DOLLAR REGISTER INSTR
-%token END ENDL
+%token END ENDL CSR SREGISTER
 
 %token<ival> INTEGER HEX
 %token<sval> STRING COMMENT LABEL GLOBAL EXTERN SECTION WORD SKIP
-%type<ival> HALT
-%type<ival> INT INSTR CALL
+%type<ival> HALT CSR
+%type<ival> INT INSTR CALL ST LD
 
-%type<sval> REGISTER
+%type<sval> REGISTER SREGISTER
 
 /* rules */
 %%
 
 file:
   template footer {
-    if(!firstPass){
+    if(firstPass){
       Assembler::currSection->setSize(Assembler::locationCounter);
+    }else{
+      Assembler::currSection->setSize(Assembler::locationCounter);
+      //dodavanje bazena literala u masinski kod
+      Assembler::addPoolData(Assembler::currSection->getName()); //da li povecavam section size?
     }
     Assembler::locationCounter = 0;
     Assembler::currSection = nullptr;
@@ -179,7 +183,24 @@ line:
           Assembler::addData(s);
         }else{
           //oruje se sa 8 i ostavlja relokacioni zapis
+          string h = $2;
+          if(Assembler::getFromPool(h) == nullptr){ //ako nije vec dodat
+            LiteralSym* l = new LiteralSym(h, 0);
+            Assembler::addToPool(l);
+          }
           int opcode = $1 | 8;
+          string s = "";
+          int offset = Assembler::currSection->getSize() + Assembler::getFromPool($2)->getOffset() - 4 - Assembler::locationCounter;
+          if(offset > 4095){ //displacement moze biti samo pozitivan
+            cerr << "Offset greater than 2^12 - 1" << endl;
+            exit(-1);
+          }
+          s = s + Assembler::prepareOffset(offset, "r0");
+          s = s + "f0" + Assembler::prepareData(opcode);
+          Assembler::addData(s);
+          //dodati relokacioni zapis
+          int off = Assembler::currSection->getSize() + Assembler::getFromPool($2)->getOffset();
+          Assembler::addRelocation(off, Assembler::getSymbol($2));
         }
       }
     }
@@ -253,15 +274,54 @@ line:
           Assembler::addData(s);
         }else{
           //oruje se sa 8 i ostavlja relokacioni zapis
+          string h = $8;
+          if(Assembler::getFromPool(h) == nullptr){ //ako nije vec dodat
+            LiteralSym* l = new LiteralSym(h, 0);
+            Assembler::addToPool(l);
+          }
           int opcode = $1 | 8;
+          string s = "";
+          int offset = Assembler::currSection->getSize() + Assembler::getFromPool($8)->getOffset() - 4 - Assembler::locationCounter;
+          if(offset > 4095){ //displacement moze biti samo pozitivan
+            cerr << "Offset greater than 2^12 - 1" << endl;
+            exit(-1);
+          }
+          s = s + Assembler::prepareOffset(offset, $6);
+          s = s + "f" + Assembler::prepareRegister($3) + Assembler::prepareData(opcode);
+          Assembler::addData(s);
+          //dodati relokacioni zapis
+          int off = Assembler::currSection->getSize() + Assembler::getFromPool($8)->getOffset();
+          Assembler::addRelocation(off, Assembler::getSymbol($8));
         }
       }
     }
     Assembler::locationCounter += 4;
     free($8);
   }
+  | CSR SREGISTER COMMA PERCENT REGISTER ENDLS {
+    string s = "0000";
+    if(!firstPass){
+      s = s + Assembler::prepareRegister($5) + Assembler::prepareRegister($2);
+      s += Assembler::prepareData($1);
+      Assembler::addData(s);
+    }
+    Assembler::locationCounter += 4;
+    free($2);
+    free($5);
+  }
+  | CSR PERCENT REGISTER COMMA SREGISTER ENDLS {
+    string s = "0000";
+    if(!firstPass){
+      s = s + Assembler::prepareRegister($5) + Assembler::prepareRegister($3);
+      s += Assembler::prepareData($1);
+      Assembler::addData(s);
+    }
+    Assembler::locationCounter += 4;
+    free($3);
+    free($5);
+  }
   | INSTR PERCENT REGISTER COMMA PERCENT REGISTER ENDLS {
-    // add %r1, %r2 ili ove sa csrrd, csrwr
+    // add %r1, %r2
     Assembler::locationCounter += 4;
     if(!firstPass) { //radi za aritmeticke, logicke(bez not) i pomeracke
       string s = "00" + Assembler::prepareRegister($3) + "0";
@@ -272,20 +332,347 @@ line:
     }
     free($3); free($6);
   }
-  | INSTR DOLLAR INTEGER COMMA PERCENT REGISTER ENDLS {
+  | ST PERCENT REGISTER COMMA DOLLAR INTEGER ENDLS {
+    // st %r3, $5
+    cerr << "Error: Invalid operation on line " << linenum << endl;
+    exit(-1);
+  }
+  | ST PERCENT REGISTER COMMA DOLLAR STRING ENDLS {
+    // st %r3, $labela
+    cerr << "Error: Invalid operation on line " << linenum << endl;
+    exit(-1);
+  }
+  | ST PERCENT REGISTER COMMA HEX ENDLS {
+    // st %r3, 0x4000F0A0
+    // bazen literala
+    int opcode = $1 | 2;
+    int hex = $5;
+    string h = to_string(hex);
+    if(firstPass){
+      if(Assembler::getFromPool(h) == nullptr){ //ako nije vec dodat
+        LiteralSym* l = new LiteralSym(h, hex);
+        Assembler::addToPool(l);
+      }
+    }else{
+      //upisuje se pomeraj do bazena gde se nalazi literal
+      //a literal ce se na kraju dodati u masinski kod
+      string s = "";
+      int offset = Assembler::currSection->getSize() + Assembler::getFromPool(h)->getOffset() - 4 - Assembler::locationCounter;
+      if(offset > 4095){ //displacement moze biti samo pozitivan
+        cerr << "Offset greater than 2^12 - 1" << endl;
+        exit(-1);
+      }
+      s = s + Assembler::prepareOffset(offset, $3);
+      s = s + "f0" + Assembler::prepareData(opcode);
+      Assembler::addData(s);
+    }
+    Assembler::locationCounter += 4;
+    free($3);
+  }
+  | ST PERCENT REGISTER COMMA STRING ENDLS {
+    // st %r3, labela
+    // bazen literala + relokacioni zapis ako labela nije u istoj sekciji
+    if(!firstPass){
+      if(!Assembler::getSymbol($5)){
+      cerr << "On line " << linenum << ": symbol '" << $5 << "' not defined" << endl;
+      exit(-1);
+      }else{
+        if(Assembler::getSymbol($5)->getSection() == Assembler::currSection){
+          //prvi mod ostaje, u displacement pomeraj do simbola
+          int displacement = Assembler::getSymbol($5)->getOffset() - Assembler::locationCounter - 4;
+          string s = "";
+          s = s + Assembler::prepareOffset(displacement, $3);
+          s = s + "f0" + Assembler::prepareData($1);
+          Assembler::addData(s);
+        }else{
+          //oruje se sa 2 i ostavlja relokacioni zapis za bazen literala
+          //u displacement ide pomeraj do bazena
+          string h = $5;
+          if(Assembler::getFromPool(h) == nullptr){ //ako nije vec dodat
+            LiteralSym* l = new LiteralSym(h, 0);
+            Assembler::addToPool(l);
+          }
+          int opcode = $1 | 2;
+          string s = "";
+          int offset = Assembler::currSection->getSize() + Assembler::getFromPool($5)->getOffset() - 4 - Assembler::locationCounter;
+          if(offset > 4095){ //displacement moze biti samo pozitivan
+            cerr << "Offset greater than 2^12 - 1" << endl;
+            exit(-1);
+          }
+          s = s + Assembler::prepareOffset(offset, $3);
+          s = s + "f0" + Assembler::prepareData(opcode);
+          Assembler::addData(s);
+          //dodati relokacioni zapis
+          int off = Assembler::currSection->getSize() + Assembler::getFromPool($5)->getOffset();
+          Assembler::addRelocation(off, Assembler::getSymbol($5));
+        }
+      }
+    }
+    Assembler::locationCounter += 4;
+    free($3);
+    free($5);
+  }
+  | ST PERCENT REGISTER COMMA PERCENT REGISTER ENDLS {
+    // st %r3, %r5
+    cerr << "Error: Invalid operation on line " << linenum << endl;
+    exit(-1);
+  }
+  | ST PERCENT REGISTER COMMA L_PAR PERCENT REGISTER R_PAR ENDLS {
+    // st %r3, [%r5]
+    if(!firstPass){
+      string s = "00";
+      s += Assembler::prepareRegister($3) + "0";
+      s += Assembler::prepareRegister($7) + "0";
+      s += Assembler::prepareData($1);
+      Assembler::addData(s);
+    }
+    Assembler::locationCounter += 4;
+    free($3);
+    free($7);
+  }
+  | ST PERCENT REGISTER COMMA L_PAR PERCENT REGISTER PLUS HEX R_PAR ENDLS {
+    // st %r3, [%r5 + 0x08]
+    int hex = $9;
+    if(hex < -2048 || hex > 2047){
+      cerr << "Error on line " << linenum << endl;
+      exit(-1);
+    }
+    if(!firstPass){
+      string s = "";
+      s += Assembler::prepareOffset(hex, $3);
+      s += Assembler::prepareRegister($7) + "0";
+      s += Assembler::prepareData($1);
+      Assembler::addData(s);
+    }
+    Assembler::locationCounter += 4;
+    free($3);
+    free($7);
+  }
+  | ST PERCENT REGISTER COMMA L_PAR PERCENT REGISTER PLUS STRING R_PAR ENDLS {
+    // st %r3, [%r5 + labela]
+    cerr << "Error: Invalid operation on line " << linenum << endl;
+    exit(-1);
+  }
+  | LD DOLLAR INTEGER COMMA PERCENT REGISTER ENDLS {
     // ld $5, %r3
-    cout << "Instruction opcode: " << $1 << endl; //treba orovati sa modom i videti da nije slucaj kada
-    //zauzima 2 instrukcije, odnosno 8 bajta
-    cout << "Register: " << $6  << endl;
+    int opcode = $1 | 2;
+    int hex = $3;
+    string h = to_string(hex);
+    if(firstPass){
+      if(Assembler::getFromPool(h) == nullptr){ //ako nije vec dodat
+        LiteralSym* l = new LiteralSym(h, hex);
+        Assembler::addToPool(l);
+      }
+    }else{
+      string s = "";
+      int offset = Assembler::currSection->getSize() + Assembler::getFromPool(h)->getOffset() - 4 - Assembler::locationCounter;
+      if(offset > 4095){ //displacement moze biti samo pozitivan
+        cerr << "Offset greater than 2^12 - 1" << endl;
+        exit(-1);
+      }
+      s = s + Assembler::prepareOffset(offset, "r0");
+      s = s + Assembler::prepareRegister($6) + "f" + Assembler::prepareData(opcode);
+      Assembler::addData(s);
+    }
     Assembler::locationCounter += 4;
     free($6);
   }
-  | INSTR PERCENT REGISTER COMMA DOLLAR INTEGER ENDLS {
-    // st %r3, $5
-    cout << "Instruction opcode: " << $1 << endl;
-    cout << "Register: " << $3  << endl;
+  | LD DOLLAR HEX COMMA PERCENT REGISTER ENDLS {
+    // ld $0x0555, %r3
+    int opcode = $1 | 2;
+    int hex = $3;
+    string h = to_string(hex);
+    if(firstPass){
+      if(Assembler::getFromPool(h) == nullptr){ //ako nije vec dodat
+        LiteralSym* l = new LiteralSym(h, hex);
+        Assembler::addToPool(l);
+      }
+    }else{
+      string s = "";
+      int offset = Assembler::currSection->getSize() + Assembler::getFromPool(h)->getOffset() - 4 - Assembler::locationCounter;
+      if(offset > 4095){ //displacement moze biti samo pozitivan
+        cerr << "Offset greater than 2^12 - 1" << endl;
+        exit(-1);
+      }
+      s = s + Assembler::prepareOffset(offset, "r0");
+      s = s + Assembler::prepareRegister($6) + "f" + Assembler::prepareData(opcode);
+      Assembler::addData(s);
+    }
+    Assembler::locationCounter += 4;
+    free($6);
+  }
+  | LD DOLLAR STRING COMMA PERCENT REGISTER ENDLS {
+    // ld $labela, %r3
+    // ako je labela u istoj sekciji ne mora u bazen
+    if(!firstPass){
+      if(!Assembler::getSymbol($3)){
+      cerr << "On line " << linenum << ": symbol '" << $3 << "' not defined" << endl;
+      exit(-1);
+      }else{
+        if(Assembler::getSymbol($3)->getSection() == Assembler::currSection){
+          //prelazak u drugi mod, u displacement pomeraj do simbola
+          int opcode = $1 | 1;
+          int displacement = Assembler::getSymbol($3)->getOffset() - Assembler::locationCounter - 4;
+          cout << "DISPLACEMENT: " << displacement << endl;
+          cout << "VALUE: " << Assembler::getSymbol($3)->getOffset() << " LC: " << Assembler::locationCounter << endl;
+          string s = "";
+          s = s + Assembler::prepareOffset(displacement, "r0");
+          s = s + Assembler::prepareRegister($6) + "f" + Assembler::prepareData(opcode);
+          Assembler::addData(s);
+        }else{
+          //oruje se sa 2 i ostavlja relokacioni zapis za bazen literala
+          //u displacement ide pomeraj do bazena
+          string h = $3;
+          if(Assembler::getFromPool(h) == nullptr){ //ako nije vec dodat
+            LiteralSym* l = new LiteralSym(h, 0);
+            Assembler::addToPool(l);
+          }
+          int opcode = $1 | 2;
+          string s = "";
+          int offset = Assembler::currSection->getSize() + Assembler::getFromPool($3)->getOffset() - 4 - Assembler::locationCounter;
+          if(offset > 4095){ //displacement moze biti samo pozitivan
+            cerr << "Offset greater than 2^12 - 1" << endl;
+            exit(-1);
+          }
+          s = s + Assembler::prepareOffset(offset, "r0");
+          s = s + Assembler::prepareRegister($6) + "f" + Assembler::prepareData(opcode);
+          Assembler::addData(s);
+          //dodati relokacioni zapis
+          int off = Assembler::currSection->getSize() + Assembler::getFromPool($3)->getOffset();
+          Assembler::addRelocation(off, Assembler::getSymbol($3));
+        }
+      }
+    }
     Assembler::locationCounter += 4;
     free($3);
+    free($6);
+  }
+  | LD PERCENT REGISTER COMMA PERCENT REGISTER ENDLS {
+    // ld %r1, %r3
+    int opcode = $1 | 1;
+    if(!firstPass){
+      string s = "0000";
+      s += Assembler::prepareRegister($6) + Assembler::prepareRegister($3);
+      s += Assembler::prepareData(opcode);
+      Assembler::addData(s);
+    }
+    Assembler::locationCounter += 4;
+    free($3);
+    free($6);
+  }
+  | LD L_PAR PERCENT REGISTER R_PAR COMMA PERCENT REGISTER ENDLS {
+    // ld [%r1], %r3
+    int opcode = $1 | 2;
+    if(!firstPass){
+      string s = "0000";
+      s += Assembler::prepareRegister($8) + Assembler::prepareRegister($4);
+      s += Assembler::prepareData(opcode);
+      Assembler::addData(s);
+    }
+    Assembler::locationCounter += 4;
+    free($4);
+    free($8);
+  }
+  | LD L_PAR PERCENT REGISTER PLUS HEX R_PAR COMMA PERCENT REGISTER ENDLS {
+    // ld [%r1 + 0x03], %r3
+    int opcode = $1 | 2;
+    int hex = $6;
+    if(!firstPass){
+      string s = Assembler::prepareOffset(hex, "r0");
+      s += Assembler::prepareRegister($10) + Assembler::prepareRegister($4);
+      s += Assembler::prepareData(opcode);
+      Assembler::addData(s);
+    }
+    Assembler::locationCounter += 4;
+    free($4);
+    free($10);
+  }
+  | LD L_PAR PERCENT REGISTER PLUS STRING R_PAR COMMA PERCENT REGISTER ENDLS {
+    // ld [%r1 + labela], %r3
+    cerr << "Error: Invalid operation on line " << linenum << endl;
+    exit(-1);
+  }
+  | LD HEX COMMA PERCENT REGISTER ENDLS {
+    // ld 0x53530000, %r1
+    //bice dve instrukcije
+    //odredisni registar se iskoristi kao akumulator
+    int hex = $2;
+    int opcode = $1 | 2;
+    string h = to_string(hex);
+    if(firstPass){
+      if(Assembler::getFromPool(h) == nullptr){ //ako nije vec dodat
+        LiteralSym* l = new LiteralSym(h, hex);
+        Assembler::addToPool(l);
+      }
+    }else{
+      //upisuje se pomeraj do bazena gde se nalazi literal
+      //a literal ce se na kraju dodati u masinski kod
+      string s = "";
+      int offset = Assembler::currSection->getSize() + Assembler::getFromPool(h)->getOffset() - 4 - Assembler::locationCounter;
+      if(offset > 4095){ //displacement moze biti samo pozitivan
+        cerr << "Offset greater than 2^12 - 1" << endl;
+        exit(-1);
+      }
+      s = s + Assembler::prepareOffset(offset, "r0");
+      s = s + Assembler::prepareRegister($5) + "f" + Assembler::prepareData(opcode); //prvo memind
+      Assembler::addData(s);
+      s = "0000";
+      s += Assembler::prepareRegister($5) + Assembler::prepareRegister($5);
+      s += Assembler::prepareData(opcode);
+      Assembler::addData(s);
+    }
+    Assembler::locationCounter += 8;
+    free($5);
+  }
+  | LD STRING COMMA PERCENT REGISTER ENDLS {
+    // ld labela, %r1
+    //bice dve instrukcije
+    int opcode = $1 | 2;
+    if(!firstPass){
+      if(!Assembler::getSymbol($2)){
+      cerr << "On line " << linenum << ": symbol '" << $2 << "' not defined" << endl;
+      exit(-1);
+      }else{
+        if(Assembler::getSymbol($2)->getSection() == Assembler::currSection){
+          //u displacement pomeraj do simbola
+          int displacement = Assembler::getSymbol($2)->getOffset() - Assembler::locationCounter - 4;
+          string s = "";
+          s = s + Assembler::prepareOffset(displacement, "r0");
+          s = s + Assembler::prepareRegister($5) + "f" + Assembler::prepareData(opcode);
+          Assembler::addData(s);
+          s = "0000";
+          s += Assembler::prepareRegister($5) + Assembler::prepareRegister($5);
+          s += Assembler::prepareData(opcode);
+          Assembler::addData(s);
+        }else{
+          //ostavlja se relokacioni zapis za bazen literala
+          //u displacement ide pomeraj do bazena
+          string h = $2;
+          if(Assembler::getFromPool(h) == nullptr){ //ako nije vec dodat
+            LiteralSym* l = new LiteralSym(h, 0);
+            Assembler::addToPool(l);
+          }
+          string s = "";
+          int offset = Assembler::currSection->getSize() + Assembler::getFromPool($2)->getOffset() - 4 - Assembler::locationCounter;
+          if(offset > 4095){ //displacement moze biti samo pozitivan
+            cerr << "Offset greater than 2^12 - 1" << endl;
+            exit(-1);
+          }
+          s = s + Assembler::prepareOffset(offset, "r0");
+          s = s + Assembler::prepareRegister($5) + "f" + Assembler::prepareData(opcode);
+          Assembler::addData(s);
+          s = "0000";
+          s += Assembler::prepareRegister($5) + Assembler::prepareRegister($5);
+          s += Assembler::prepareData(opcode);
+          Assembler::addData(s);
+          //dodati relokacioni zapis
+          int off = Assembler::currSection->getSize() + Assembler::getFromPool($2)->getOffset();
+          Assembler::addRelocation(off, Assembler::getSymbol($2));
+        }
+      }
+    }
+    Assembler::locationCounter += 8;
+    free($5);
   }
   | CALL HEX ENDLS {
     //ovaj hex se dodaje u tabelu literala
@@ -333,6 +720,11 @@ line:
         }else{
           //oruje se sa 1 i ostavlja relokacioni zapis za bazen literala
           //u displacement ide pomeraj do bazena
+          string h = $2;
+          if(Assembler::getFromPool(h) == nullptr){ //ako nije vec dodat
+            LiteralSym* l = new LiteralSym(h, 0);
+            Assembler::addToPool(l);
+          }
           int opcode = $1 | 1;
           string s = "";
           int offset = Assembler::currSection->getSize() + Assembler::getFromPool($2)->getOffset() - 4 - Assembler::locationCounter;
@@ -350,14 +742,14 @@ line:
       }
     }else{ //prvi prolaz
       //moram dodati simbol u bazen iako mozda nije potreban
-      string h = $2;
+      /*string h = $2;
       if(Assembler::getFromPool(h) == nullptr){ //ako nije vec dodat
         LiteralSym* l = new LiteralSym(h, 0);
         Assembler::addToPool(l);
-      }
+      }*/
     }
     Assembler::locationCounter += 4;
-    //free($2);
+    free($2);
   }
   | INSTR ENDLS {
     if($1 == Assembler::HALT || $1 == Assembler::INT){
@@ -373,7 +765,13 @@ line:
       }
       Assembler::locationCounter += 4;
     }else{
-        //IRET
+      //IRET
+      //prvo ide push status pa push pc
+      if(!firstPass){
+        Assembler::addData("0800ee91"); //sp+8
+        Assembler::addData("fc0f0e96"); //status = mem[sp-4]
+        Assembler::addData("f80ffe92"); //pc = mem[sp-8]
+      }
       Assembler::locationCounter += 12; //3 instrukcije
     }
   }
@@ -450,10 +848,14 @@ word_loop:
 %%
 
 int main(int argc, char** argv){
-  FILE* myFile = fopen("in.snazzle", "r");
+  if(argc < 4){
+    cout << "Bad arguments" << endl;
+    return -1;
+  }
+  FILE* myFile = fopen(argv[3], "r");
 
   if(!myFile){
-    cout << "Ne postoji fajl" << endl;
+    cout << "File open error" << endl;
     return -1;
   }
 
@@ -461,7 +863,7 @@ int main(int argc, char** argv){
 
   yyparse();
   cout << linenum << endl;
-  cout << "LC (first pass): " << Assembler::locationCounter << endl;
+  //cout << "LC (first pass): " << Assembler::locationCounter << endl;
   fseek(myFile, 0, SEEK_SET); //drugi prolaz
   firstPass = false;
   linenum = 0;

@@ -170,6 +170,15 @@ string Assembler::prepareOffset(int o, string reg){
 string Assembler::prepareRegister(string reg){
   string s = "";
   int r;
+  if(reg.compare("%status") == 0){
+    return s + "0";
+  }
+  if(reg.compare("%handler") == 0){
+    return s + "1";
+  }
+  if(reg.compare("%cause") == 0){
+    return s + "2";
+  }
   if(reg.find_first_of("r") != string::npos){
     if(reg.size() == 3){
       s = s + reg[1] + reg[2];
@@ -193,7 +202,8 @@ void Assembler::addPoolData(string section){
   if(Assembler::literalPool.find(section) != Assembler::literalPool.end()){
     for(LiteralSym* el: Assembler::literalPool.at(section)){
       string s = Assembler::prepareLiteral(el->getValue());
-      Assembler::addData(s);     
+      Assembler::addData(s);
+      Assembler::currSection->setSize(Assembler::currSection->getSize() + 4); //povecava se velicina sekcije
     }
   }
 }
@@ -231,7 +241,7 @@ void Assembler::printRelocationData(){
     cout << left << setw(16) << "SYMBOL";
     cout << left << setw(11) << "ADDEND" << endl;
     for(RelocationSymbol* c: itr->second){
-      cout << *c << endl;
+      cout << *c;
     }
   }
 }

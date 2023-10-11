@@ -50,7 +50,7 @@ public:
     LD = 0b10010000, //neke se ORuju sa modom adresiranja
     ST = 0b10000000,
     CSRRD = 0b10010000,
-    CSRWR = 0b10000000
+    CSRWR = 0b10010100
   };
 
   static int locationCounter;
