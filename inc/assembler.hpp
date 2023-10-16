@@ -1,6 +1,6 @@
 #ifndef ASSEMBLER_HPP_
 #define ASSEMBLER_HPP_
-#include <iostream>
+#include <fstream>
 #include <list>
 #include "./symbol.hpp"
 #include "./section.hpp"
@@ -19,6 +19,7 @@ private:
   static list<Symbol*> symbolList;
   static list<Section*> sectionList;
   static unordered_map<string, vector<char>> machineCode; //za svaku sekciju hex kod
+  static unordered_map<string, vector<unsigned long>> machineCodeBin;
   static unordered_map<string, vector<LiteralSym*>> literalPool;
   static unordered_map<string, vector<RelocationSymbol*>> relocationList;
 
@@ -55,6 +56,7 @@ public:
 
   static int locationCounter;
   static Section* currSection;
+  static string outputFile;
   static void printSymbols();
   static void addSymbol(Symbol* s);
   static void printSections();
@@ -74,6 +76,7 @@ public:
   static void addPoolData(string section);
   static void addRelocation(int offset, Symbol* s);
   static void printRelocationData();
+  static unsigned long toBinary(string i);
 };
 
 #endif

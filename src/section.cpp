@@ -8,6 +8,12 @@ Section::Section(string name){
   this->id = cnt++;
 }
 
+Section::Section(int id, string name, string file){
+  this->id = id;
+  this->name = name;
+  this->inputFile = file;
+}
+
 string Section::getName(){
   if(this) return this->name;
   else return "UND";
@@ -22,6 +28,10 @@ ostream& operator<<(ostream& os, const Section &sec){
 
 bool Section::operator==(const Section& s){
   return this->name == s.name;
+}
+
+void Section::binPrint(ostream& os){
+  os << dec << this->id << " " << this->name << " " << dec << this->size << endl;
 }
 
 void Section::setSize(int s){

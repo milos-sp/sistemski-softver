@@ -14,9 +14,13 @@ private:
   bool isGlobal;
   int offset;
   int value;
+  string section;
+  string inputFile;
 
 public:
   Symbol(string name, Section* sec, bool isGlobal);
+  Symbol(string name, string section, bool isGlobal);
+  Symbol(string name, string section, bool isGlobal, int offset, string file);
 
   void setGlobal(bool g);
   void setOffset(int offset);
@@ -30,6 +34,7 @@ public:
   int getValue();
   friend ostream& operator <<(ostream& os, const Symbol &sym);
   int getId();
+  void binPrint(ostream& os);
 };
 
 #endif

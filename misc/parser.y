@@ -513,8 +513,8 @@ line:
           //prelazak u drugi mod, u displacement pomeraj do simbola
           int opcode = $1 | 1;
           int displacement = Assembler::getSymbol($3)->getOffset() - Assembler::locationCounter - 4;
-          cout << "DISPLACEMENT: " << displacement << endl;
-          cout << "VALUE: " << Assembler::getSymbol($3)->getOffset() << " LC: " << Assembler::locationCounter << endl;
+          //cout << "DISPLACEMENT: " << displacement << endl;
+          //cout << "VALUE: " << Assembler::getSymbol($3)->getOffset() << " LC: " << Assembler::locationCounter << endl;
           string s = "";
           s = s + Assembler::prepareOffset(displacement, "r0");
           s = s + Assembler::prepareRegister($6) + "f" + Assembler::prepareData(opcode);
@@ -853,7 +853,7 @@ int main(int argc, char** argv){
     return -1;
   }
   FILE* myFile = fopen(argv[3], "r");
-
+  Assembler::outputFile = argv[2];
   if(!myFile){
     cout << "File open error" << endl;
     return -1;
@@ -868,6 +868,7 @@ int main(int argc, char** argv){
   firstPass = false;
   linenum = 0;
   yyparse();
+  fclose(myFile);
   Assembler::printSymbols();
   Assembler::printSections();
   Assembler::printData();

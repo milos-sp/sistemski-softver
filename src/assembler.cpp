@@ -4,16 +4,32 @@ list<Symbol*> Assembler::symbolList;
 list<Section*> Assembler::sectionList;
 int Assembler::locationCounter = 0;
 Section* Assembler::currSection = nullptr;
+string Assembler::outputFile = "";
 unordered_map<string, vector<char>> Assembler::machineCode;
+unordered_map<string, vector<unsigned long>> Assembler::machineCodeBin;
 unordered_map<string, vector<LiteralSym*>> Assembler::literalPool;
 unordered_map<string, vector<RelocationSymbol*>> Assembler::relocationList;
 
 void Assembler::printSymbols(){
-  cout << "ID\t" << "SYMBOL\t\t" << "SECTION\t\t" << "TYPE\t   " << "VALUE" << endl;
-  cout << "--------------------------------------------------------------" << endl;
+  ofstream out;
+  out.open(Assembler::outputFile, std::ios::binary);
+  out << "SYMBOL_TABLE_START" << endl;
+  int pos = Assembler::outputFile.find('.');
+  string f = Assembler::outputFile.substr(0, pos) + ".obj";
+  ofstream outFile(f); //tekstualni fajl
+  outFile << left << setw(8) << "ID";
+  outFile << left << setw(16) << "SYMBOL";
+  outFile << left << setw(16) << "SECTION";
+  outFile << left << setw(11) << "TYPE";
+  outFile << left << setw(12) << "VALUE" << endl;
+  outFile << "--------------------------------------------------------------" << endl;
   for(Symbol* s: Assembler::symbolList){
-    cout << *s << endl;
+    outFile << *s << endl;
+    s->binPrint(out);
   }
+  out << "SYMBOL_TABLE_END" << endl;
+  outFile.close();
+  out.close();
 }
 
 void Assembler::addSymbol(Symbol* s){
@@ -25,11 +41,31 @@ void Assembler::addSection(Section* s){
 }
 
 void Assembler::printSections(){
-  cout << "ID\t" << "SECTION\t\t" << "SIZE" << endl;
-  cout << "----------------------------------------------" << endl;
+  ofstream out;
+  out.open(Assembler::outputFile, std::ios::binary | std::ios::app);
+  int pos = Assembler::outputFile.find('.');
+  string f = Assembler::outputFile.substr(0, pos) + ".obj";
+  std::ofstream outFile(f, std::ios::app); //tekstualni fajl
+  outFile << left << setw(8) << "ID";
+  outFile << left << setw(16) << "SECTION";
+  outFile << left << setw(5) << "SIZE" << endl;
+  outFile << "----------------------------------------------" << endl;
+  out << "SECTION_TABLE_START" << endl;
   for(Section* s: Assembler::sectionList){
-    cout << *s << endl;
+    outFile << *s << endl;
+   // out.write((char*)&(*s), sizeof(Section)); out << endl;
+   //out << *s << endl;
+   s->binPrint(out);
   }
+  out << "SECTION_TABLE_END" << endl;
+  outFile.close();
+  out.close();
+  // fstream out1;
+  // out1.open("out.o", std::ios::in | std::ios::binary);
+  // Section sec("");
+  // out1.read((char*)&sec, sizeof(Section));
+  // cout << "IZ FAJLA: " << sec << endl;
+  // out1.close();
 }
 
 bool Assembler::hasSection(Section* sec){
@@ -53,6 +89,13 @@ Symbol* Assembler::getSymbol(string name){
   return nullptr;
 }
 
+unsigned long Assembler::toBinary(string i){
+  string n = "";
+  int ind = i.length();
+  n = n + i.at(ind-2) + i.at(ind-1) + i.at(ind-4) + i.at(ind-3) + i.at(ind-6) + i.at(ind-5) + i.at(ind-8) + i.at(ind-7);
+  return stoul(n, nullptr, 16);
+}
+
 void Assembler::addData(string d){
   if(Assembler::machineCode.find(Assembler::currSection->getName()) == Assembler::machineCode.end()){
     //prvi put ova sekcija
@@ -61,11 +104,15 @@ void Assembler::addData(string d){
       v.push_back(c);
     }
     Assembler::machineCode.insert(make_pair(Assembler::currSection->getName(), v));
+    vector<unsigned long> vi;
+    vi.push_back(toBinary(d));
+    Assembler::machineCodeBin.insert(make_pair(Assembler::currSection->getName(), vi));
   }else{
     //samo se dodaje
     for(char c: d){
       Assembler::machineCode.at(Assembler::currSection->getName()).push_back(c);
     }
+    Assembler::machineCodeBin.at(Assembler::currSection->getName()).push_back(toBinary(d));
   }
 }
 
@@ -105,22 +152,39 @@ void Assembler::clear(){
 }
 
 void Assembler::printData(){
+  int pos = Assembler::outputFile.find('.');
+  string f = Assembler::outputFile.substr(0, pos) + ".obj";
+  std::ofstream outFile(f, std::ios::app); //tekstualni fajl
   unordered_map<string, vector<char>>::iterator itr;
-  cout << "MACHINE CODE" << endl;
+  outFile << "MACHINE CODE" << endl;
   for(itr = Assembler::machineCode.begin(); itr != Assembler::machineCode.end(); itr++){
-    cout << "#." << itr->first << endl;
+    outFile << "#." << itr->first << endl;
     int br = 0;
     for(char c: itr->second){
-      cout << c;
+      outFile << c;
       br++;
-      if(br % 2 == 0 && br != 16) cout << " ";
+      if(br % 2 == 0 && br != 16) outFile << " ";
       if(br == 16){
-        cout << endl;
+        outFile << endl;
         br = 0;
       }
     }
-    cout << endl;
+    outFile << endl;
   }
+  ofstream out;
+  out.open(Assembler::outputFile, std::ios::binary | std::ios::app);
+  out << "MACHINE_CODE_START" << endl;
+  for(auto itrb = Assembler::machineCodeBin.begin(); itrb != Assembler::machineCodeBin.end(); itrb++){
+    cout << "#." << itrb->first << endl;
+    out << itrb->first << endl;
+    for(auto i: itrb->second){
+      cout << "HEX: " << hex << setw(8) << setfill('0') << i << endl;
+      out << hex << setw(8) << setfill('0') << i << endl;
+      //out << i << endl;
+    }
+  }
+  out << "MACHINE_CODE_END" << endl;
+  out.close();
 }
 
 string Assembler::prepareData(int ins){
@@ -231,17 +295,28 @@ void Assembler::addRelocation(int offset, Symbol* s){
 }
 
 void Assembler::printRelocationData(){
+  ofstream out;
+  out.open(Assembler::outputFile, std::ios::binary | std::ios::app);
+  out << "REL_SYMBOL_TABLE_START" << endl;
+  int pos = Assembler::outputFile.find('.');
+  string f = Assembler::outputFile.substr(0, pos) + ".obj";
+  std::ofstream outFile(f, std::ios::app); //tekstualni fajl
   unordered_map<string, vector<RelocationSymbol*>>::iterator itr;
-  cout << "RELOCATION DATA" << endl;
+  outFile << "RELOCATION DATA" << endl;
   for(itr = Assembler::relocationList.begin(); itr != Assembler::relocationList.end(); itr++){
-    cout << "#.rela." << itr->first << endl;
+    outFile << "#.rela." << itr->first << endl;
     int br = 0;
-    cout << left << setw(8) << "OFFSET";
-    cout << left << setw(16) << "TYPE";
-    cout << left << setw(16) << "SYMBOL";
-    cout << left << setw(11) << "ADDEND" << endl;
+    outFile << left << setw(8) << "OFFSET";
+    outFile << left << setw(16) << "TYPE";
+    outFile << left << setw(16) << "SYMBOL";
+    outFile << left << setw(11) << "ADDEND" << endl;
     for(RelocationSymbol* c: itr->second){
-      cout << *c;
+      outFile << *c;
+      out << itr->first << " ";
+      c->binPrint(out);
     }
   }
+  out << "REL_SYMBOL_TABLE_START" << endl;
+  outFile.close();
+  out.close();
 }
