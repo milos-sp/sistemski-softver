@@ -2,6 +2,8 @@
 #define SECTION_HPP_
 
 #include <iostream>
+#include <vector>
+#include <list>
 using namespace std;
 
 class Section{
@@ -11,6 +13,9 @@ class Section{
     int id;
     int size;
     string inputFile;
+    list<char> data;
+    uint32_t startMem;
+    bool visited;
 
   public:
     Section(string name);
@@ -22,6 +27,14 @@ class Section{
     void setSize(int s);
     int getSize();
     void binPrint(ostream& os);
+    string getFileName();
+    void setData(list<char> list);
+    list<char> getData();
+    void printData();
+    void setStart(uint32_t mem);
+    uint32_t getStart();
+    void setVisited(); //za pomoc prilikom rasporeda sekcija
+    bool isVisited();
 };
 
 #endif

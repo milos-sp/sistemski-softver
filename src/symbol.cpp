@@ -66,12 +66,20 @@ void Symbol::setValue(int value){
   this->value = value;
 }
 
+string Symbol::getNameOfSection(){
+  return this->section;
+}
+
 int Symbol::getValue(){
   return this->value;
 }
 
 int Symbol::getOffset(){
   return this->offset;
+}
+
+string Symbol::getFileName(){
+  return this->inputFile;
 }
 
 ostream& operator<<(ostream& os, const Symbol &sym){

@@ -20,7 +20,6 @@ class Scanner{
     list<Section*> getSectionsFromFile();
     list<Symbol*> getSymbolsFromFile();
     list<RelocationSymbol*> getRelocFromFile();
-    list<char> getSecDataFromFile();
     void getSectionData(Section* sec);
 };
 

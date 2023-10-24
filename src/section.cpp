@@ -41,3 +41,50 @@ void Section::setSize(int s){
 int Section::getSize(){
   return this->size;
 }
+
+string Section::getFileName(){
+  return this->inputFile;
+}
+
+void Section::setData(list<char> list){
+  while(!list.empty()){
+    char c = list.front();
+    this->data.push_back(c);
+    list.pop_front();
+  }
+}
+
+list<char> Section::getData(){
+  return this->data;
+}
+
+void Section::printData(){
+  int cnt = 0;
+  list<char> list = this->data;
+  while(!list.empty()){
+    char c = list.front();
+    cout << c;
+    cnt++;
+    if(cnt == 8){
+      cnt = 0;
+      cout << endl;
+    }
+    list.pop_front();
+  }
+}
+
+void Section::setStart(uint32_t mem){
+  this->startMem = mem;
+}
+
+uint32_t Section::getStart(){
+  return this->startMem;
+}
+
+void Section::setVisited(){
+  this->visited = true;
+}
+
+bool Section::isVisited(){
+  return this->visited;
+}

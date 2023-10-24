@@ -20,7 +20,14 @@ class RelocationSymbol{
     RelocationSymbol(int o, string t, Symbol* s, int a);
     RelocationSymbol(int o, string t, string symName, int symId, string section, int a, string file);
     friend ostream& operator <<(ostream& os, const RelocationSymbol& rs);
+    void setSymbol(Symbol* s);
+    Symbol* getSymbol();
     void binPrint(ostream& os);
+    int getAddend();
+    int getOffset();
+    string getRelSection();
+    string getNameOfSymbol();
+    string getNameOfFile();
 };
 
 #endif

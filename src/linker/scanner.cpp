@@ -90,3 +90,28 @@ list<RelocationSymbol*> Scanner::getRelocFromFile(){
   input.close();
   return rels;
 }
+
+void Scanner::getSectionData(Section* sec){
+  fstream input;
+  input.open(fileName, std::ios::in | std::ios::binary);
+  string line;
+  list<char> data;
+  while(getline(input, line)){
+    if(line.compare("MACHINE_CODE_START") == 0) break;
+  }
+  string section;
+  while(getline(input, line)){
+    if(line.substr(0, 5) == "START"){
+      int pos = line.find_first_of('_');
+      section = line.substr(pos + 1);
+      if(sec->getName().compare(section) == 0) break;
+    }
+  }
+  while(getline(input, line) && line.compare("END_" + section) != 0){
+    for(char c: line){
+      data.push_back(c);
+    }
+  }
+  sec->setData(data);
+  input.close(); 
+}

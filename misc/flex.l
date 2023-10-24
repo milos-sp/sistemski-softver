@@ -112,9 +112,9 @@ STRING \s
 "%" { return PERCENT; }
 "$" { return DOLLAR; }
 
+\n { linenum++; return ENDL; }
 "#"[^\n\r]* { return COMMENT; }
 
-\n { linenum++; return ENDL; }
 [ \t]   ;
 0[xX][0-9a-fA-F]+ { sscanf(yytext, "%x", &yylval.ival); return HEX; }
 [0-9]+ { yylval.ival = atoi(yytext); return INTEGER; }

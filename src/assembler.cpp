@@ -174,15 +174,31 @@ void Assembler::printData(){
   ofstream out;
   out.open(Assembler::outputFile, std::ios::binary | std::ios::app);
   out << "MACHINE_CODE_START" << endl;
-  for(auto itrb = Assembler::machineCodeBin.begin(); itrb != Assembler::machineCodeBin.end(); itrb++){
+  for(auto itrb = Assembler::machineCode.begin(); itrb != Assembler::machineCode.end(); itrb++){
+    out << "START_" << itrb->first << endl;
+    int br = 0;
+    for(char c: itrb->second){
+      out << c;
+      br++;
+      if(br == 8){
+        out << endl;
+        br = 0;
+      }
+    }
+    out << "END_" << itrb->first << endl;
+  }
+  /*for(auto itrb = Assembler::machineCodeBin.begin(); itrb != Assembler::machineCodeBin.end(); itrb++){
     cout << "#." << itrb->first << endl;
-    out << itrb->first << endl;
+    out << "START_" << itrb->first << endl;
     for(auto i: itrb->second){
-      cout << "HEX: " << hex << setw(8) << setfill('0') << i << endl;
-      out << hex << setw(8) << setfill('0') << i << endl;
+      stringstream stream;
+      stream << hex << setw(8) << setfill('0') << i;
+      cout << "HEX: " << stream.str() << endl;
+      out << stream.str() << endl;
       //out << i << endl;
     }
-  }
+    out << "END_" << itrb->first << endl;
+  }*/
   out << "MACHINE_CODE_END" << endl;
   out.close();
 }
@@ -276,7 +292,7 @@ void Assembler::addRelocation(int offset, Symbol* s){
   RelocationSymbol* rs;
   if(!s->isGlobalSymbol()){
     //mora sekcija u kojoj se nalazi da bude dodata, a addend je onda njegova vrednost
-    string sec = "." + s->getSection()->getName();
+    string sec = s->getSection()->getName();
     Symbol* a = Assembler::getSymbol(sec);
     int addend = s->getOffset();
     rs = new RelocationSymbol(offset, "R_X86_64_32", a, addend);
@@ -316,7 +332,7 @@ void Assembler::printRelocationData(){
       c->binPrint(out);
     }
   }
-  out << "REL_SYMBOL_TABLE_START" << endl;
+  out << "REL_SYMBOL_TABLE_END" << endl;
   outFile.close();
   out.close();
 }

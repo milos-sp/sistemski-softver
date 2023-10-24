@@ -16,6 +16,7 @@ int main(int argc, char** argv){
     exit(-1);
   }
   int ind;
+  map<uint32_t, string> places;
   for(ind = 2; ind < argc; ind++){
     string arg = string(argv[ind]);
     if(arg.substr(0, 7).compare("-place=") == 0){
@@ -25,6 +26,7 @@ int main(int argc, char** argv){
       cout << section << " ";
       string hex = arg.substr(pos + 1);
       cout << hex << endl;
+      places.insert(make_pair(stoi(hex, 0, 16), section));
     }else{
       break;
     }
@@ -34,32 +36,34 @@ int main(int argc, char** argv){
     exit(-1);
   }
   ind++;
-  for(; ind < argc; ind++){ //prvo ide izlazni fajl pa ulazni fajlovi
+  list<string> inputs;
+  string output = argv[ind++]; // prvo ide izlazni fajl
+  for(; ind < argc; ind++){ // pa ulazni fajlovi
     cout << argv[ind] << endl;
+    inputs.push_back(argv[ind]);
   }
-  file.open("out.o", std::ios::in);
-  string line;
-  getline(file, line);
-  //getline(file, line);
- /* while(getline(file, line) && line.substr(0, 7) != "SECTION"){
-    cout << *link.prepareSection(line) << endl;
-  }*/
-  /*while(getline(file, line)){
-    cout << line << endl;
-  }*/
-  file.close();
-  Scanner scanner = Scanner("out.o");
+  Linker linker = Linker(output, inputs);
+  linker.setPositions(places);
+  /*Scanner scanner = Scanner("out.o");
   list<Section*> sections = scanner.getSectionsFromFile();
-  for(Section* el: sections){
-    cout << *el << endl;
-  }
   list<Symbol*> symbols = scanner.getSymbolsFromFile();
-  for(Symbol* el: symbols){
-    cout << *el << endl;
-  }
   list<RelocationSymbol*> relSymbols = scanner.getRelocFromFile();
-  for(RelocationSymbol* el: relSymbols){
-    cout << *el << endl;
-  }
+
+  linker.addSections(sections);
+  linker.addSymbols(symbols);
+  linker.addRelSymbols(relSymbols);
+  linker.getSecDataFromFile();*/
+  //umesto svega ovog gore linker.collectData();
+  linker.collectData();
+  linker.placeSections();
+  linker.resolve();
+  linker.resolveSymbolsU();
+  linker.resolveRelocations();
+  linker.printSections();
+  linker.printSymbols();
+  linker.printRelocs();
+  linker.printData();
+  linker.printToHexFile();
+  
   return 0;
 }

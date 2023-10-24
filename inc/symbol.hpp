@@ -32,9 +32,11 @@ public:
   int getOffset();
   bool isGlobalSymbol();
   int getValue();
+  string getNameOfSection();
   friend ostream& operator <<(ostream& os, const Symbol &sym);
   int getId();
   void binPrint(ostream& os);
+  string getFileName();
 };
 
 #endif

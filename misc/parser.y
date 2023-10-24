@@ -68,8 +68,8 @@ line:
     //cout << "New section: " << $2 << endl;
     Section *s = new Section($2);
     if(firstPass){
-      string n = ".";
-      Symbol* sym = new Symbol(n+$2, s, false); //dodavanje i u tabelu simbola
+      //string n = ".";
+      Symbol* sym = new Symbol($2, s, false); //dodavanje i u tabelu simbola
       Assembler::addSymbol(sym);
       if(!Assembler::hasSection(s)) Assembler::addSection(s);
       else{
@@ -101,8 +101,8 @@ line:
     }
     free($1);
   }
-  | COMMENT ENDLS {
-    //cout << "Found a comment " << endl;
+  | comment ENDL {
+    cout << "Found a comment " << endl;
   }
   | STRING COLON ENDLS {
     Symbol* s = new Symbol($1, nullptr, false);
@@ -779,13 +779,20 @@ line:
     cout << "Neki string: " << $1 << endl;
     free($1);
   }
+  | ENDLS {
+
+  }
   ;
 footer:
   END ENDLS
   | END;
 ENDLS:
   ENDLS ENDL
-  | ENDL;
+  | ENDL
+  | comment;
+
+comment:
+  COMMENT; //neki conflict sada
 
 ext_glob:
   extern_list

@@ -28,6 +28,34 @@ ostream& operator<<(ostream& os, const RelocationSymbol& rs){
   return os;
 }
 
+int RelocationSymbol::getAddend(){
+  return this->addend;
+}
+
+int RelocationSymbol::getOffset(){
+  return this->offset;
+}
+
+void RelocationSymbol::setSymbol(Symbol* s){
+  this->sym = s;
+}
+
+Symbol* RelocationSymbol::getSymbol(){
+  return this->sym;
+}
+
+string RelocationSymbol::getRelSection(){
+  return this->secName;
+}
+
+string RelocationSymbol::getNameOfSymbol(){
+  return this->symName;
+}
+
+string RelocationSymbol::getNameOfFile(){
+  return this->inputFile;
+}
+
 void RelocationSymbol::binPrint(ostream& os){
   os << this->offset << " " << this->type << " " << this->sym->getId() << " " << this->sym->getName() << " " << this->addend << endl;
 }
