@@ -26,7 +26,7 @@ int main(int argc, char** argv){
       cout << section << " ";
       string hex = arg.substr(pos + 1);
       cout << hex << endl;
-      places.insert(make_pair(stoi(hex, 0, 16), section));
+      places.insert(make_pair(stol(hex, 0, 16), section));
     }else{
       break;
     }

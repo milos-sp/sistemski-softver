@@ -326,7 +326,7 @@ line:
     if(!firstPass) { //radi za aritmeticke, logicke(bez not) i pomeracke
       string s = "00" + Assembler::prepareRegister($3) + "0";
       if($1 != Assembler::XCHG) s = s + Assembler::prepareRegister($6) + Assembler::prepareRegister($6);
-      else s = s + Assembler::prepareRegister($6) + "0"; //kod xchg je AAAA deo 0
+      else s = s + "0" + Assembler::prepareRegister($6); //kod xchg je AAAA deo 0
       s += Assembler::prepareData($1);
       Assembler::addData(s);
     }
@@ -760,7 +760,7 @@ line:
       Assembler::locationCounter += 4;
     }else if($1 == Assembler::RET){
       if(!firstPass){
-        string s = "0400fd" + Assembler::prepareData($1);
+        string s = "0400fe" + Assembler::prepareData($1);
         Assembler::addData(s);
       }
       Assembler::locationCounter += 4;

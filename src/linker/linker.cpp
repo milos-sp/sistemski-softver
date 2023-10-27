@@ -37,8 +37,10 @@ void Linker::symValidation(Symbol* sym){
   for(Symbol* el: this->symbolList){
     //treba proveriti da li postoje dva lokalna simbola istog imena u istoj sekciji
     if(section.compare(el->getNameOfSection()) == 0 && el->getNameOfSection().compare("UND") != 0 &&
-    name.compare(el->getName()) == 0){
+    name.compare(el->getName()) == 0 && section.compare(name) != 0){ //ne vazi za ime sekcije
       cerr << "Two symbols with same name in section " << section << endl;
+      cerr << "Symbol: " << el->getName() << endl;
+      cerr << el->getFileName() << endl;
       exit(-1);
     }
     //ne sme biti ni dva globalna simbola istog imena
@@ -279,7 +281,12 @@ void Linker::printData(){
 void Linker::printToHexFile(){
   ofstream out(this->output);
   int line = 0;
+  uint32_t prev;
   for(auto pair: this->dataMap){
+    if(line % 2 == 1 && pair.first - prev != 4){
+      line = 0; //da mi ne ispise novu sekciju na pogresno mesto
+      out << endl;
+    }
     if(line % 2 == 0){
       stringstream stream;
       stream << hex << setw(8) << setfill('0') << pair.first;
@@ -288,6 +295,7 @@ void Linker::printToHexFile(){
      out << this->prepareWord(pair.second) << endl;
     }
     line++;
+    prev = pair.first;
   }
 }
 

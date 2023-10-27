@@ -14,14 +14,7 @@ lexer.cpp: misc/flex.l parser.hpp
 linker: $(SRCSL) inc/symbol.hpp inc/section.hpp inc/linker/linker.hpp inc/linker/scanner.hpp inc/relocation.hpp
 	$(CC) $(SRCSL) -lfl -o linker
 
+emulator: src/emulator/main.cpp src/emulator/emulator.cpp inc/emulator/emulator.hpp
+	$(CC) src/emulator/main.cpp src/emulator/emulator.cpp -lfl -o emulator
 clean:
 	rm -rf *.o lexer.cpp lexer.hpp parser.cpp parser.hpp asembler
-
-# parser.cpp parser.hpp: misc/parser.y
-# 	bison -d misc/parser.y
-
-# lexer.cpp: misc/flex.l parser.hpp
-# 	flex misc/flex.l
-
-# asembler: lexer.cpp parser.cpp parser.hpp
-# 	g++ parser.cpp lexer.cpp src/assembler.cpp -lfl -o asembler
