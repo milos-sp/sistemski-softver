@@ -84,10 +84,6 @@ void Linker::resolveSymbolsU(){
         cerr << "Symbol " << el->getName() << " can't be resolved" << endl;
         exit(-1);
       }
-      // cout << "GLOBAL: " << *glob->getSection();
-      // stringstream stream;
-      // stream << hex << setw(8) << setfill('0') << glob->getValue();
-      // cout << "     value: " << stream.str() << endl;
       el->setSection(glob->getSection());
       el->setValue(glob->getValue());
     }
@@ -214,7 +210,6 @@ string Linker::prepareValue(uint32_t val){
 }
 
 void Linker::resolveRelocations(){
-  cout << "HERE" << endl;
   for(RelocationSymbol* el: this->relocationList){
     //na adresu sekcije + pomeraj relokacionog simbola treba upisati vrednost simbola + addend
     uint32_t val = el->getSymbol()->getValue() + el->getAddend();
@@ -226,7 +221,7 @@ void Linker::resolveRelocations(){
       itr->second = this->prepareValue(val);
       stringstream stream;
       stream << hex << setw(8) << setfill('0') << itr->first;
-      cout << stream.str() << ": " << itr->second << endl;
+    //  cout << stream.str() << ": " << itr->second << endl;
     }
   }
 }

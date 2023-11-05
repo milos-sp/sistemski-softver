@@ -17,15 +17,15 @@ void Emulator::printRegisters(){
   cout << "Emulated processor executed halt instruction" << endl;
   cout << "Emulated processor state:" << endl;
   for(int i = 0; i < 16; i++){
-    cout << "r" << dec << i << "=0x" << hex << setw(8) << setfill('0') << registers[i];
+    if(i > 9){
+      cout << "r" << dec << i << "=0x" << hex << setw(8) << setfill('0') << registers[i];
+    }else{
+      cout << " r" << dec << i << "=0x" << hex << setw(8) << setfill('0') << registers[i];
+    }
     if(i % 4 == 3){
       cout << endl;
     }else {
-      if(i > 9){
-        cout << "   ";
-      }else{
-        cout << "    ";
-      }
+      cout << "    ";
     }
   }
 }

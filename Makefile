@@ -3,7 +3,7 @@ CC = g++
 SRCSL = src/linker/main.cpp src/symbol.cpp src/linker/linker.cpp src/section.cpp src/linker/scanner.cpp src/relocation.cpp
 
 all: $(SRCS) inc/assembler.hpp inc/symbol.hpp inc/section.hpp inc/literalPool.hpp inc/relocation.hpp
-	$(CC) $(SRCS) -lfl -o asembler
+	$(CC) $(SRCS) -lfl -o assembler
 
 parser.cpp parser.hpp: misc/parser.y inc/assembler.hpp inc/symbol.hpp inc/section.hpp
 	bison -d misc/parser.y
@@ -17,4 +17,4 @@ linker: $(SRCSL) inc/symbol.hpp inc/section.hpp inc/linker/linker.hpp inc/linker
 emulator: src/emulator/main.cpp src/emulator/emulator.cpp inc/emulator/emulator.hpp
 	$(CC) src/emulator/main.cpp src/emulator/emulator.cpp -lfl -o emulator
 clean:
-	rm -rf *.o lexer.cpp lexer.hpp parser.cpp parser.hpp asembler
+	rm -rf *.obj *.o lexer.cpp lexer.hpp parser.cpp parser.hpp assembler

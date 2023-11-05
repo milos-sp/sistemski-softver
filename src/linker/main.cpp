@@ -23,9 +23,8 @@ int main(int argc, char** argv){
       string section;
       int pos = arg.find_first_of('@');
       section = arg.substr(7, pos - 7);
-      cout << section << " ";
+      
       string hex = arg.substr(pos + 1);
-      cout << hex << endl;
       places.insert(make_pair(stol(hex, 0, 16), section));
     }else{
       break;
@@ -39,30 +38,19 @@ int main(int argc, char** argv){
   list<string> inputs;
   string output = argv[ind++]; // prvo ide izlazni fajl
   for(; ind < argc; ind++){ // pa ulazni fajlovi
-    cout << argv[ind] << endl;
     inputs.push_back(argv[ind]);
   }
   Linker linker = Linker(output, inputs);
   linker.setPositions(places);
-  /*Scanner scanner = Scanner("out.o");
-  list<Section*> sections = scanner.getSectionsFromFile();
-  list<Symbol*> symbols = scanner.getSymbolsFromFile();
-  list<RelocationSymbol*> relSymbols = scanner.getRelocFromFile();
-
-  linker.addSections(sections);
-  linker.addSymbols(symbols);
-  linker.addRelSymbols(relSymbols);
-  linker.getSecDataFromFile();*/
-  //umesto svega ovog gore linker.collectData();
   linker.collectData();
   linker.placeSections();
   linker.resolve();
   linker.resolveSymbolsU();
   linker.resolveRelocations();
-  linker.printSections();
-  linker.printSymbols();
-  linker.printRelocs();
-  linker.printData();
+  //linker.printSections();
+  //linker.printSymbols();
+  //linker.printRelocs();
+  //linker.printData();
   linker.printToHexFile();
   
   return 0;

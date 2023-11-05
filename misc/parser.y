@@ -49,7 +49,7 @@ file:
     }
     Assembler::locationCounter = 0;
     Assembler::currSection = nullptr;
-    cout << "Done with a file!" << endl;
+    //cout << "Done with a file!" << endl;
     YYACCEPT; //ignorise sve posle .end
   };
 template:
@@ -61,14 +61,13 @@ line:
   ext_glob ENDLS
   |
   word ENDLS {
-    cout << "Word directive" << endl;
+    
   }
   |
   SECTION STRING ENDLS {
     //cout << "New section: " << $2 << endl;
     Section *s = new Section($2);
     if(firstPass){
-      //string n = ".";
       Symbol* sym = new Symbol($2, s, false); //dodavanje i u tabelu simbola
       Assembler::addSymbol(sym);
       if(!Assembler::hasSection(s)) Assembler::addSection(s);
@@ -102,7 +101,7 @@ line:
     free($1);
   }
   | comment ENDL {
-    cout << "Found a comment " << endl;
+    
   }
   | STRING COLON ENDLS {
     Symbol* s = new Symbol($1, nullptr, false);
@@ -245,7 +244,7 @@ line:
       //a literal ce se na kraju dodati u masinski kod
       string s = "";
       int offset = Assembler::currSection->getSize() + Assembler::getFromPool(h)->getOffset() - 4 - Assembler::locationCounter;
-      //cout << "Offset to pool: " << offset << endl;
+
       if(offset > 4095){ //displacement moze biti samo pozitivan
         cerr << "Offset greater than 2^12 - 1" << endl;
         exit(-1);
@@ -678,7 +677,7 @@ line:
     //ovaj hex se dodaje u tabelu literala
     //oruje se opcode sa 1 da bi bio drugi mod
     int hex = $2;
-    cout << "Hex address: " << hex << endl;
+    //cout << "Hex address: " << hex << endl;
     int opcode = $1 | 1;
     string h = to_string(hex);
     if(firstPass){
@@ -691,7 +690,7 @@ line:
       //a literal ce se na kraju dodati u masinski kod
       string s = "";
       int offset = Assembler::currSection->getSize() + Assembler::getFromPool(h)->getOffset() - 4 - Assembler::locationCounter;
-      //cout << "Offset to pool: " << offset << endl;
+      
       if(offset > 4095){ //displacement moze biti samo pozitivan
         cerr << "Offset greater than 2^12 - 1" << endl;
         exit(-1);
@@ -776,7 +775,7 @@ line:
     }
   }
   | STRING ENDLS {
-    cout << "Neki string: " << $1 << endl;
+    //cout << "Neki string: " << $1 << endl;
     free($1);
   }
   | ENDLS {
@@ -792,22 +791,21 @@ ENDLS:
   | comment;
 
 comment:
-  COMMENT; //neki conflict sada
+  COMMENT;
 
 ext_glob:
   extern_list
   ;
 extern_list:
   EXTERN {
-    cout << "Extern symbols: " << endl;
+   // cout << "Extern symbols: " << endl;
   } extern_loop
   | GLOBAL {
-    cout << "Global symbols: " << endl;
+   // cout << "Global symbols: " << endl;
   } extern_loop
   ;
 extern_loop:
   STRING {
-    cout << $1 << endl;
     Symbol *s = new Symbol($1, nullptr, false);
     if(firstPass) Assembler::addSymbol(s);
     else{
@@ -819,7 +817,6 @@ extern_loop:
     free($1);
   }
   | extern_loop COMMA STRING{
-    cout << $3 << endl;
     Symbol *s = new Symbol($3, nullptr, false);
     if(firstPass) Assembler::addSymbol(s);
     else{
@@ -844,12 +841,42 @@ word_loop:
       Assembler::addData(s);
     }
   }
+  | STRING {
+    Assembler::locationCounter += 4;
+    //ostavlja relokacioni zapis
+    if(!firstPass){
+      if(!Assembler::getSymbol($1)){
+        cerr << "On line " << linenum << ": symbol '" << $1 << "' not defined" << endl;
+        exit(-1);
+      }else{
+        Assembler::addData("00000000");
+        //dodati relokacioni zapis
+        int off = Assembler::locationCounter - 4;
+        Assembler::addRelocation(off, Assembler::getSymbol($1));
+      }
+    }
+  }
   | word_loop COMMA INTEGER{
     Assembler::locationCounter += 4;
     string s = "";
     if(!firstPass){
       s = Assembler::prepareLiteral($3);
       Assembler::addData(s);
+    }
+  }
+  | word_loop COMMA STRING{
+    Assembler::locationCounter += 4;
+    //ostavlja relokacioni zapis
+    if(!firstPass){
+      if(!Assembler::getSymbol($3)){
+        cerr << "On line " << linenum << ": symbol '" << $3 << "' not defined" << endl;
+        exit(-1);
+      }else{
+        Assembler::addData("00000000");
+        //dodati relokacioni zapis
+        int off = Assembler::locationCounter - 4;
+        Assembler::addRelocation(off, Assembler::getSymbol($3));
+      }
     }
   };
 %%
@@ -867,10 +894,8 @@ int main(int argc, char** argv){
   }
 
   yyin = myFile;
-
   yyparse();
-  cout << linenum << endl;
-  //cout << "LC (first pass): " << Assembler::locationCounter << endl;
+  
   fseek(myFile, 0, SEEK_SET); //drugi prolaz
   firstPass = false;
   linenum = 0;
